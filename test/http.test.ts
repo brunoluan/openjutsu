@@ -110,6 +110,9 @@ test("reverse proxy headers and explicit public origins are honored only when co
     headers: { Authorization: authorization, Host: "app.modal.run", Origin: "https://app.modal.run", "Sec-Fetch-Site": "same-origin" },
   })), null);
   assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {
+    headers: { Authorization: authorization, Host: "app.modal.run", "X-Forwarded-Host": "app.modal.run", "X-Forwarded-Proto": "http", Origin: "https://app.modal.run", "Sec-Fetch-Site": "same-origin" },
+  })), null);
+  assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {
     headers: { Authorization: authorization, Host: "app.modal.run", Origin: "https://attacker.example", "Sec-Fetch-Site": "same-origin" },
   }))?.status, 403);
   assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {

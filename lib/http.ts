@@ -130,7 +130,7 @@ export function apiAccess(request: Request) {
   const expectedOrigins = new Set<string>();
   try {
     expectedOrigins.add(new URL(`${scheme}//${effectiveHost}`).origin);
-    if (trustProxy && !protocol && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(effectiveHost)) {
+    if (trustProxy && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(effectiveHost)) {
       expectedOrigins.add(new URL(`https://${effectiveHost}`).origin);
     }
   } catch {}
