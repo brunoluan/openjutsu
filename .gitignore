@@ -8,3 +8,6 @@ AGENTS.md
 CLAUDE.md
 public/_test
 public/_montage_test
+__pycache__/
+*.py[cod]
+.bin/

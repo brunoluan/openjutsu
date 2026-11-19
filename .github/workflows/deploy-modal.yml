@@ -1,0 +1,104 @@
+name: Deploy to Modal
+
+on:
+  workflow_dispatch:
+    inputs:
+      gpu_type:
+        description: "GPU no Modal (L4 = mais barata ~$0.80/h; L40S = 2x mais rápida)"
+        required: true
+        default: "L4"
+        type: choice
+        options:
+          - L4
+          - L40S
+      fast_describer:
+        description: "Usar descritor 4B FP8 (economiza ~4 GB de armazenamento)"
+        required: false
+        default: false
+        type: boolean
+      with_picture:
+        description: "Baixar também modelos do modo From picture (SolarRenderer)"
+        required: false
+        default: false
+        type: boolean
+      skip_model_download:
+        description: "Pular download dos modelos (marque se já baixou antes)"
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build, download models & deploy to Modal
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      OPENJUTSU_PASSWORD: ${{ secrets.OPENJUTSU_PASSWORD }}
+      OPENJUTSU_MODAL_GPU: ${{ inputs.gpu_type }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Modal CLI
+        run: pip install --no-cache-dir modal
+
+      - name: Validate GitHub Secrets
+        run: |
+          missing=0
+          if [ -z "${MODAL_TOKEN_ID:-}" ]; then
+            echo "::error::Falta o secret MODAL_TOKEN_ID em Settings -> Secrets and variables -> Actions."
+            missing=1
+          fi
+          if [ -z "${MODAL_TOKEN_SECRET:-}" ]; then
+            echo "::error::Falta o secret MODAL_TOKEN_SECRET em Settings -> Secrets and variables -> Actions."
+            missing=1
+          fi
+          if [ -z "${OPENJUTSU_PASSWORD:-}" ] || [ "${#OPENJUTSU_PASSWORD}" -lt 12 ]; then
+            echo "::error::O secret OPENJUTSU_PASSWORD deve estar definido e ter pelo menos 12 caracteres."
+            missing=1
+          fi
+          exit "$missing"
+
+      - name: Sync Openjutsu login password to Modal Secret
+        run: modal secret create --force openjutsu-auth OPENJUTSU_PASSWORD="$OPENJUTSU_PASSWORD"
+
+      - name: Download models to persistent Modal Volume (CPU-only)
+        if: ${{ !inputs.skip_model_download }}
+        run: |
+          args=()
+          if [ "${{ inputs.fast_describer }}" = "true" ]; then
+            args+=(--fast-describer)
+          fi
+          if [ "${{ inputs.with_picture }}" = "true" ]; then
+            args+=(--with-picture)
+          fi
+          modal run deploy/modal_app.py "${args[@]}"
+
+      - name: Deploy Openjutsu web UI + GPU backend to Modal
+        run: |
+          set -o pipefail
+          modal deploy deploy/modal_app.py 2>&1 | tee deploy.log
+          url="$(grep -oE 'https://[a-zA-Z0-9.-]+\.modal\.run' deploy.log | head -n1 || true)"
+          {
+            echo "## Openjutsu implantado no Modal!"
+            echo ""
+            if [ -n "$url" ]; then
+              echo "- **URL do site:** $url"
+            else
+              echo "- Verifique os logs acima ou acesse https://modal.com/apps para copiar a URL."
+            fi
+            echo "- **Usuário:** \`openjutsu\`"
+            echo "- **Senha:** a mesma cadastrada no secret \`OPENJUTSU_PASSWORD\`"
+            echo "- **GPU:** \`${{ inputs.gpu_type }}\`"
+            echo "- **Auto scale-to-zero:** desliga sozinho 10 min após fechar a aba."
+          } >> "$GITHUB_STEP_SUMMARY"
