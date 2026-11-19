@@ -1,0 +1,57 @@
+name: Modal Status & Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_http:
+        description: "Testar requisição HTTP autenticada para o endpoint"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    name: Inspect Modal app & logs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+      MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+      OPENJUTSU_PASSWORD: ${{ secrets.OPENJUTSU_PASSWORD }}
+    steps:
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Modal CLI
+        run: pip install --no-cache-dir modal
+
+      - name: App & container info
+        run: |
+          modal app list
+          modal app info openjutsu-cloud || true
+          modal container list || true
+
+      - name: Fetch recent Modal logs
+        run: |
+          modal app logs openjutsu-cloud --tail 300 --timestamps --show-function-id || true
+
+      - name: Test authenticated HTTP endpoint
+        if: ${{ inputs.test_http }}
+        run: |
+          URL="https://qualidadeufs--openjutsu-cloud-openjutsuserver-serve.us-east.modal.run"
+          echo "Testing unauthenticated (expect 401 after cold start):"
+          curl -sS -i -L --max-time 300 "$URL/" | head -n 30 || true
+          echo ""
+          echo "Testing authenticated (expect 200):"
+          curl -sS -i -L --max-time 300 -u "openjutsu:$OPENJUTSU_PASSWORD" "$URL/" | head -n 30 || true
+          echo ""
+          echo "Testing /api/models:"
+          curl -sS -i -L --max-time 120 -u "openjutsu:$OPENJUTSU_PASSWORD" "$URL/api/models" | head -n 30 || true
+          echo ""
+          echo "Logs after HTTP test:"
+          modal app logs openjutsu-cloud --tail 150 --timestamps || true
