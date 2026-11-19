@@ -13,7 +13,7 @@ Esta pasta contém a automação completa para rodar o **Openjutsu** na nuvem pa
 | **3. RunPod (Network Volume)** | **RTX 3090 / 4090** (24 GB VRAM, 64 GB RAM) | ~\$0,22–\$0,59/h (~15 h/mês = ~\$5–\$9) | ~\$7,00/mês (`100 GB` Volume) | **~\$12–\$16/mês** |
 
 > [!TIP]
-> **Por que o Modal sai praticamente grátis?** O plano Starter do Modal dá **\$30/mês em créditos gratuitos** todo mês e desliga a GPU automaticamente (`scaledown_window=600` = 10 min sem uso). Você nunca esquece a máquina ligada de madrugada.
+> **Por que o Modal sai praticamente grátis?** O plano Starter do Modal dá **\$30/mês em créditos gratuitos** todo mês e desliga a GPU automaticamente (`scaledown_window=180` = 3 min sem uso). Você nunca esquece a máquina ligada de madrugada.
 
 ---
 

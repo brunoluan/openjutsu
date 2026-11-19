@@ -100,5 +100,5 @@ jobs:
             echo "- **Usuário:** \`openjutsu\`"
             echo "- **Senha:** a mesma cadastrada no secret \`OPENJUTSU_PASSWORD\`"
             echo "- **GPU:** \`${{ inputs.gpu_type }}\`"
-            echo "- **Auto scale-to-zero:** desliga sozinho 10 min após fechar a aba."
+            echo "- **Auto scale-to-zero:** desliga sozinho 3 min após fechar a aba."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -31,7 +31,7 @@ SECRET_NAME = "openjutsu-auth"
 # Default to Nvidia L4 (24 GB VRAM, ~$0.80/hr) — cheapest 24 GB GPU on Modal.
 # Override with e.g. OPENJUTSU_MODAL_GPU=L40S for 48 GB VRAM (~2x faster).
 GPU_TYPE = os.environ.get("OPENJUTSU_MODAL_GPU", "L4")
-SCALEDOWN_SECONDS = int(os.environ.get("OPENJUTSU_SCALEDOWN_SECONDS", "600"))
+SCALEDOWN_SECONDS = int(os.environ.get("OPENJUTSU_SCALEDOWN_SECONDS", "180"))
 
 CUSTOM_NODE_REPOS = [
     "https://github.com/ethanfel/ComfyUI-MiniMaxH3-Context-Loop.git",
@@ -196,8 +196,8 @@ def _wait_for_port(port: int, timeout_s: float = 60.0) -> None:
 @app.cls(
     image=image,
     gpu=GPU_TYPE,
-    cpu=4.0,
-    memory=65536,
+    cpu=(1.0, 4.0),
+    memory=(16384, 65536),
     volumes={"/vol": vol},
     secrets=[modal.Secret.from_name(SECRET_NAME)],
     max_containers=1,
