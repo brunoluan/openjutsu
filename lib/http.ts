@@ -103,16 +103,54 @@ export function loopbackOnly(addresses: (AddressInfo | string | null)[]) {
   return addresses.length > 0 && addresses.every((address) => typeof address === "string" || /^(127\.|::1$|::ffff:127\.)/.test(address?.address ?? ""));
 }
 
+function firstHeaderValue(value: string | null) {
+  return value?.split(",")[0]?.trim() || null;
+}
+
+function forwardedParam(header: string | null, key: string) {
+  if (!header) return null;
+  const first = header.split(",")[0];
+  const match = first.match(new RegExp(`(?:^|;)\\s*${key}=(?:"([^"]+)"|([^;\\s]+))`, "i"));
+  return match?.[1] ?? match?.[2] ?? null;
+}
+
 export function apiAccess(request: Request) {
   const denied = authorize(request);
   if (denied) return denied;
   const url = new URL(request.url);
-  const protocol = request.headers.get("X-Forwarded-Proto");
+  const trustProxy = process.env.OPENJUTSU_TRUST_PROXY === "1";
+  const forwarded = request.headers.get("Forwarded");
+  const protocol = firstHeaderValue(request.headers.get("X-Forwarded-Proto")) ?? (trustProxy ? forwardedParam(forwarded, "proto") : null);
   const scheme = protocol === "http" || protocol === "https" ? `${protocol}:` : url.protocol;
-  const expectedOrigin = new URL(`${scheme}//${request.headers.get("Host") ?? url.host}`).origin;
+  const rawHost = request.headers.get("Host");
+  const forwardedHost = trustProxy
+    ? firstHeaderValue(request.headers.get("X-Forwarded-Host")) ?? forwardedParam(forwarded, "host")
+    : null;
+  const effectiveHost = forwardedHost ?? rawHost ?? url.host;
+  const expectedOrigins = new Set<string>();
+  try {
+    expectedOrigins.add(new URL(`${scheme}//${effectiveHost}`).origin);
+    if (trustProxy && !protocol && !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(effectiveHost)) {
+      expectedOrigins.add(new URL(`https://${effectiveHost}`).origin);
+    }
+  } catch {}
+  for (const allowed of (process.env.OPENJUTSU_PUBLIC_ORIGIN ?? "").split(",").map((value) => value.trim()).filter(Boolean)) {
+    expectedOrigins.add(allowed);
+  }
   const origin = request.headers.get("Origin");
   const site = request.headers.get("Sec-Fetch-Site");
-  if ((origin !== null && origin !== expectedOrigin) || (site !== null && site !== "same-origin" && site !== "none")) {
+  if ((origin !== null && !expectedOrigins.has(origin)) || (site !== null && site !== "same-origin" && site !== "none")) {
+    if (trustProxy) {
+      console.warn("[openjutsu] Rejected cross-origin API request", {
+        origin,
+        site,
+        expectedOrigins: [...expectedOrigins],
+        host: rawHost,
+        xForwardedHost: request.headers.get("X-Forwarded-Host"),
+        xForwardedProto: request.headers.get("X-Forwarded-Proto"),
+        forwarded,
+      });
+    }
     return Response.json({ error: "Cross-origin API requests are not allowed." }, { status: 403 });
   }
   return null;

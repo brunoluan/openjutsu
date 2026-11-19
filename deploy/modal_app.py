@@ -255,10 +255,11 @@ class OpenjutsuServer:
             **os.environ,
             "COMFY_BASE_URL": "http://127.0.0.1:8189",
             "COMFYUI_URL": "http://127.0.0.1:8188",
+            "OPENJUTSU_TRUST_PROXY": "1",
             "NEXT_TELEMETRY_DISABLED": "1",
         }
         self.next_proc = subprocess.Popen(
-            ["npx", "next", "start", "--hostname", "0.0.0.0", "--port", "3000"],
+            ["/opt/openjutsu/node_modules/.bin/next", "start", "--hostname", "0.0.0.0", "--port", "3000"],
             cwd="/opt/openjutsu",
             env=env,
         )

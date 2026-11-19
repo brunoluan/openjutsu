@@ -93,6 +93,34 @@ test("a configured password protects local and hosted access, including media an
   assert.equal(apiAccess(new Request("https://openjutsu.example/api/jobs", { headers: { Authorization: authorization, Origin: "https://attacker.example" } }))?.status, 403);
 });
 
+test("reverse proxy headers and explicit public origins are honored only when configured", (t) => {
+  const prev = { password: process.env.OPENJUTSU_PASSWORD, trust: process.env.OPENJUTSU_TRUST_PROXY, origin: process.env.OPENJUTSU_PUBLIC_ORIGIN };
+  process.env.OPENJUTSU_PASSWORD = "review-test-password";
+  process.env.OPENJUTSU_TRUST_PROXY = "1";
+  t.after(() => {
+    for (const [key, value] of [["OPENJUTSU_PASSWORD", prev.password], ["OPENJUTSU_TRUST_PROXY", prev.trust], ["OPENJUTSU_PUBLIC_ORIGIN", prev.origin]] as const) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  });
+  const authorization = `Basic ${Buffer.from("openjutsu:review-test-password").toString("base64")}`;
+  assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {
+    headers: { Authorization: authorization, Host: "127.0.0.1:3000", "X-Forwarded-Host": "app.modal.run", "X-Forwarded-Proto": "https", Origin: "https://app.modal.run", "Sec-Fetch-Site": "same-origin" },
+  })), null);
+  assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {
+    headers: { Authorization: authorization, Host: "app.modal.run", Origin: "https://app.modal.run", "Sec-Fetch-Site": "same-origin" },
+  })), null);
+  assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {
+    headers: { Authorization: authorization, Host: "app.modal.run", Origin: "https://attacker.example", "Sec-Fetch-Site": "same-origin" },
+  }))?.status, 403);
+  assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {
+    headers: { Authorization: authorization, Host: "app.modal.run", Origin: "https://app.modal.run", "Sec-Fetch-Site": "cross-site" },
+  }))?.status, 403);
+  process.env.OPENJUTSU_PUBLIC_ORIGIN = "https://custom.modal.run";
+  assert.equal(apiAccess(new Request("http://127.0.0.1:3000/api/setup", {
+    headers: { Authorization: authorization, Host: "127.0.0.1:3000", Origin: "https://custom.modal.run", "Sec-Fetch-Site": "same-origin" },
+  })), null);
+});
+
 test("failed sign-ins back off per client and across forged clients; the right password from a fresh client is never slowed", (t) => {
   const previous = process.env.OPENJUTSU_PASSWORD;
   process.env.OPENJUTSU_PASSWORD = "review-test-password";
