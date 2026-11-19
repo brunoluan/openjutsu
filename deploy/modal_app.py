@@ -196,8 +196,8 @@ def _wait_for_port(port: int, timeout_s: float = 60.0) -> None:
 @app.cls(
     image=image,
     gpu=GPU_TYPE,
-    cpu=(1.0, 4.0),
-    memory=(16384, 65536),
+    cpu=2.0,
+    memory=16384,
     volumes={"/vol": vol},
     secrets=[modal.Secret.from_name(SECRET_NAME)],
     max_containers=1,
@@ -227,6 +227,8 @@ class OpenjutsuServer:
                 "8188",
                 "--preview-method",
                 "auto",
+                "--cache-ram",
+                "16",
             ],
             cwd="/opt/ComfyUI",
         )
